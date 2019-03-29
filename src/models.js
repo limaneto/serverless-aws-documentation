@@ -1,63 +1,58 @@
 'use strict';
 
 function replaceModelRefs(restApiId, cfModel) {
-    if (!cfModel.Properties || !cfModel.Properties.Schema || Object.keys(cfModel.Properties.Schema).length == 0) {
-      return cfModel;
-    }
-
-    function replaceRefs(obj) {
-        for (let key of Object.keys(obj)) {
-            if (key === '$ref') {
-                let match;
-                if (match = /{{model:\s*([\-\w]+)}}/.exec(obj[key])) {
-                    obj[key] = {
-                        'Fn::Join': [
-                            '/',
-                            [
-                                'https://apigateway.amazonaws.com/restapis',
-                                restApiId,
-                                'models',
-                                match[1]
-                            ]
-                        ]
-                    };
-                    if (!cfModel.DependsOn) {
-                        cfModel.DependsOn = new Set();
-                    }
-                    cfModel.DependsOn.add(match[1]+'Model');
-                }
-            } else if (typeof obj[key] === 'object') {
-                replaceRefs(obj[key]);
-            }
-        }
-    }
-
-    replaceRefs(cfModel.Properties.Schema);
-    if (cfModel.DependsOn) {
-        cfModel.DependsOn = Array.from(cfModel.DependsOn);
-    }
+  if (!cfModel.Properties || !cfModel.Properties.Schema || Object.keys(cfModel.Properties.Schema).length == 0) {
     return cfModel;
+  }
+
+  function replaceRefs(obj) {
+    for (let key of Object.keys(obj)) {
+      if (key === '$ref') {
+        let match;
+        if (match = /{{model:\s*([\-\w]+)}}/.exec(obj[key])) {
+          obj[key] = {
+            'Fn::Join': [
+              '/',
+              [
+                'https://apigateway.amazonaws.com/restapis',
+                restApiId,
+                'models',
+                match[1]
+              ]
+            ]
+          };
+          if (!cfModel.DependsOn) {
+            cfModel.DependsOn = new Set();
+          }
+          cfModel.DependsOn.add(match[1]+'Model');
+        }
+      } else if (typeof obj[key] === 'object') {
+        replaceRefs(obj[key]);
+      }
+    }
+  }
+
+  replaceRefs(cfModel.Properties.Schema);
+  if (cfModel.DependsOn) {
+    cfModel.DependsOn = Array.from(cfModel.DependsOn);
+  }
+  return cfModel;
 }
 
 module.exports = {
   createCfModel: function createCfModel(restApiId) {
     return function(model) {
-
-      let cfModel = {
-        Type: 'AWS::ApiGateway::Model',
-        Properties: {
-          RestApiId: restApiId,
-          ContentType: model.contentType,
-          Name: model.name,
-          Schema: model.schema || {},
-        },
-      }
-
-      if (model.description) {
-        cfModel.Properties.Description = model.description
-      }
-
-      return replaceModelRefs(restApiId, cfModel)
+      return replaceModelRefs(restApiId,
+        {
+          Type: 'AWS::ApiGateway::Model',
+          Properties: {
+            RestApiId: restApiId,
+            ContentType: model.contentType,
+            Name: model.name,
+            Schema: model.schema || {},
+          },
+        }
+      );
     }
   },
 
@@ -108,5 +103,4 @@ module.exports = {
       resource.Properties.RequestModels = documentation.requestModels;
     }
   }
-
 };
